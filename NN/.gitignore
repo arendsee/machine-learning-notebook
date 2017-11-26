@@ -2,3 +2,12 @@ mnist.pkl
 data/
 *pyc
 *pkl
+
+*.tex
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.pdf
+*.bbl
+*.blg

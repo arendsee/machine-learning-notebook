@@ -1,0 +1,189 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{fullpage}
+\usepackage{longtable}
+
+% Prevent floats from crossing section or subsection boundaries
+\usepackage[section]{placeins}
+% Credit for this voodoo goes to Heiko Oberdiek
+\makeatletter
+\AtBeginDocument{%
+  \expandafter\renewcommand\expandafter\subsection\expandafter{%
+    \expandafter\@fb@secFB\subsection
+  }%
+}
+
+\makeatother
+\title{forward-backward, inside-outside, viterbi, expectation maximization}
+\author{Zebulun Arendsee}
+
+\begin{document}
+
+\maketitle
+
+This is a family of related algorithms. The names vary between fields, but the
+principles are the same. All are
+
+\begin{itemize}
+  \item fundamentally optimization problems
+  \item gradient climbing functions that are guaranteed to converge to a local maximum
+\end{itemize}
+
+This is a powerful algorithm with applications to HMM, probabilistic context
+free grammers (PCFG), and neural nets. Learning how the algorithm works is
+often complicated by exposition coupled to complexities of one of these special
+applications. I would very much like a "hello world" example that simply showed
+how the algorithm works on toy data. Yet I have not found such an example.
+
+How best to master this family depends on your background. I find the
+expectation maximization algorithm most accessible.
+
+\section{Expectation maximization (EM)}
+
+The seminal paper on EM is \cite{dempster1977maximum}.
+
+The wikipedia article for EM is very readable. So there isn't much point in my
+rehashing it here. 
+
+I will just point out that the point of EM in the statistical world is to
+estimate maximum likelihood parameters for a model where data or variables are
+missing.
+
+For reference, here is the wikipedia introduction
+
+\begin{verbatim}
+  The EM algorithm is used to find (locally) maximum likelihood parameters of a
+  statistical model in cases where the equations cannot be solved directly.
+  Typically these models involve latent variables in addition to unknown
+  parameters and known data observations. That is, either missing values exist
+  among the data, or the model can be formulated more simply by assuming the
+  existence of further unobserved data points. For example, a mixture model can
+  be described more simply by assuming that each observed data point has a
+  corresponding unobserved data point, or latent variable, specifying the
+  mixture component to which each data point belongs.
+
+  Finding a maximum likelihood solution typically requires taking the
+  derivatives of the likelihood function with respect to all the unknown
+  values, the parameters and the latent variables, and simultaneously solving
+  the resulting equations. In statistical models with latent variables, this is
+  usually impossible. Instead, the result is typically a set of interlocking
+  equations in which the solution to the parameters requires the values of the
+  latent variables and vice versa, but substituting one set of equations into
+  the other produces an unsolvable equation.
+
+  The EM algorithm proceeds from the observation that the following is a way to
+  solve these two sets of equations numerically. One can simply pick arbitrary
+  values for one of the two sets of unknowns, use them to estimate the second
+  set, then use these new values to find a better estimate of the first set,
+  and then keep alternating between the two until the resulting values both
+  converge to fixed points. It's not obvious that this will work at all, but it
+  can be proven that in this context it does, and that the derivative of the
+  likelihood is (arbitrarily close to) zero at that point, which in turn means
+  that the point is either a maximum or a saddle point.[12] In general,
+  multiple maxima may occur, with no guarantee that the global maximum will be
+  found. Some likelihoods also have singularities in them, i.e., nonsensical
+  maxima. For example, one of the solutions that may be found by EM in a
+  mixture model involves setting one of the components to have zero variance
+  and the mean parameter for the same component to be equal to one of the data
+  points.
+
+  Wikipedia - Expectation Maximization Algorithm
+\end{verbatim}
+
+Here is a simple little example from phylogenetics. I've come up with this on
+my own, though the idea is probably not globally original. Suppose you have a
+phylogenetic tree for $n$ extant species and $m$ ancestors, and you trust the
+topology of the tree, but you do not have branch lengths. Now suppose you have
+a set of $k$ homologous characters (from an alphabet of size $l$) for each
+species (say the amino acids in a multiple sequence alignment): $x_{ij}$ where
+$i \le n$ is the species index and $j \le k$ is the character index. Each site
+has a mutation rate $\mu_i$ where $i \le k$. The branch length is the
+coefficient of the mutation rate, such that $\mu_i b_j$ equals the expected
+number of events along branch $b_j$. We also have a transition matrix, $T$,
+that specifies the chance of each change given an event has occured. We also
+have the prior probabilities of each character, $\pi_i$. I will treat the
+ancestral states as a superposition, where each character has a certain
+probability of being the true one.
+
+We make a few simplifying assumptions:
+
+\begin{itemize}
+
+  \item the topology of the tree is known
+
+  \item the sites are independent, i.e. $x_{ia}$ is independent of
+    $x_{ib}$, where $a \ne b$
+
+  \item the mutation rates are constant
+
+  \item there is a maximum of 1 event per branch (this is a bad assumption if $b \mu$ is high) 
+
+\end{itemize}
+
+Let's say we know the tree topology and the extant species characters, but we
+do not know the mutation rates, ancestral states, or branch lengths.
+
+The log likelihood of a system is
+
+\begin{equation}
+  L(\boldsymbol{x}|T,\boldsymbol{b},\boldsymbol{\mu}) = \sum^k_1 \sum_{c=1}^{l} \log(p_{1c} \pi_c) \ + \  
+      \sum_{i,j=2}^{n+m-1}
+      \sum_{k'=1}^{k}
+      \sum_{c_i=1}^{l}
+      \sum_{c_j=1}^{l}
+        p_{k',i,c_i} p_{k',j,c_j}
+        \begin{cases}
+          c_i = c_j   & \log( (1 - \mu_i b) + \mu_i b T_{{c_i}{c_i}} ) \\
+          c_i \ne c_j & \log( \mu_i b T_{{c_i}{c_j}} )
+        \end{cases}
+\end{equation}
+
+where $b$ refers the the branch length leading to the current subtree root.
+The sum starts from 2, since 1 refers to root and the characters for root are
+not derived.
+
+First I will make some toy data:
+
+<<>>=
+
+require(ape)
+require(geiger)
+set.seed(42)
+tree <- ape::rcoal(6)
+
+# generate characters over the leafs
+transitions <- list(matrix(c(
+  -1,1/3,1/3,1/3,
+  1/3,-1,1/3,1/3,
+  1/3,1/3,-1,1/3,
+  1/3,1/3,1/3,-1
+), ncol=4, byrow=TRUE))
+leaf_states <- geiger::sim.char(tree, par=transitions, model='discrete', nsim=100)[,1,]
+@
+
+The first step of implementing EM is to simulate initial values:
+
+<<>>=
+initialize <- function(phylo){
+  # continue from here
+}
+@
+
+\section{The forward-backward (aka inside-outside) algorithm}
+
+\section{Papers}
+
+\subsection{Pedagogical papers}
+
+\subsubsection{Jason Eisner (2016) {\it Inside-Outside and Forward-Backward Algorithms Are Just Backprop} \cite{eisner2016inside}}
+
+This paper presents the algorithm mostly from the grammatical point of view.
+The paper is intended to be a simple tutorial, but I think the author is a bit
+out-of-touch, nonchalantly using acronyms and jargon that few outside his field
+would know. The few inside his field probably don't need to read the paper. Oh
+well.
+
+\bibliographystyle{plain}
+\bibliography{em_etal}
+
+\end{document}
