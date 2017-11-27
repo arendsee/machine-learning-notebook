@@ -1,6 +1,6 @@
 TARGET=em_etal
 
-${TARGET}.pdf: ${TARGET}.Rnw ${TARGET}.bib
+all:
 	Rscript -e "library(knitr); knit('${TARGET}.Rnw')"
 	latexmk -bibtex -pdf ${TARGET}.tex
 

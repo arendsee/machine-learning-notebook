@@ -123,24 +123,51 @@ We make a few simplifying assumptions:
 Let's say we know the tree topology and the extant species characters, but we
 do not know the mutation rates, ancestral states, or branch lengths.
 
-The log likelihood of a system is
+The likelihood of a system is
 
-\begin{equation}
-  L(\boldsymbol{x}|T,\boldsymbol{b},\boldsymbol{\mu}) = \sum^k_1 \sum_{c=1}^{l} \log(p_{1c} \pi_c) \ + \  
-      \sum_{i,j=2}^{n+m-1}
-      \sum_{k'=1}^{k}
-      \sum_{c_i=1}^{l}
-      \sum_{c_j=1}^{l}
-        p_{k',i,c_i} p_{k',j,c_j}
-        \begin{cases}
-          c_i = c_j   & \log( (1 - \mu_i b) + \mu_i b T_{{c_i}{c_i}} ) \\
-          c_i \ne c_j & \log( \mu_i b T_{{c_i}{c_j}} )
-        \end{cases}
-\end{equation}
+\begin{align*}
+  P(\boldsymbol{x}|T,\boldsymbol{b},\boldsymbol{\mu}) & =
+    \left( \prod^k_1 \prod_{c=1}^{l} p_{1c} \pi_c \right) \ 
+    \prod_{i,j=2}^{n+m-1}
+    \prod_{k'=1}^{k}
+    \left[ \left(
+      \prod_{c_i=1}^{l}
+      \prod_{c_j \ne c_i}^{l}
+        p_{k',i,c_i} \  p_{k',j,c_j} \ \mu_{k'} b T_{{c_i}{c_j}}
+    \right)
+    \left(
+      \prod_{c=1}^{l}
+        p_{k',i,c} \  p_{k',j,c} \ (1 - \mu_{k'} b) + \mu_{k'} b T_{cc}
+    \right)\right] \\
+  {} & =
+    \left( \prod_a^{m+n} \prod_b^k \prod_c^l \prod_d^l p_{abcd} \right)
+    \left( \prod_a^{m+n-1} \prod_b^k \prod_c^{l} \prod_d^{l} \mu_b b_{a} T_{{c}{d}} \right)
+    \left( \prod_a^{m+n-1} \prod_b^k \prod_c^l 1 - \mu_b b_a(1 + T_{cc}) \right)
+\end{align*}
 
 where $b$ refers the the branch length leading to the current subtree root.
 The sum starts from 2, since 1 refers to root and the characters for root are
 not derived.
+
+Next I need to find the derivatives for $p$, $\mu$, $\pi$ and $b$ for the log likelihood.
+
+\begin{equation}
+  \frac{dL}{dp_{ijc}} \propto \frac{1}{p_{ijc}}
+\end{equation}
+
+\begin{equation}
+  \frac{dL}{d\pi_i} \propto \frac{1}{\pi_i}
+\end{equation}
+
+\begin{align}
+  \frac{dL}{d\mu_{i}} & = \frac{(m+n-1)l^2}{\mu_i} +
+    \sum_a^{m+n-1} \sum_b^l  \frac{b_a(1 + T_{bb})}{1 - \mu_i b_a(1 + T_{bb})}
+\end{align}
+
+\begin{align}
+  \frac{dL}{d b_{i}} & = \frac{(m+n-1)l^2}{b_i} +
+    \sum_a^k \sum_b^l \frac{\mu_a(1 + T_{bb})}{1 - \mu_a b_i(1 + T_{bb})}
+\end{align}
 
 First I will make some toy data:
 
